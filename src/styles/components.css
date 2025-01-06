@@ -74,48 +74,50 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--border-radius);
   max-width: 80%;
   position: relative;
   word-wrap: break-word;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
 }
 
 .ai-message {
   background-color: var(--ai-message-bg);
   margin-right: auto;
-  margin-left: 20px;
+  margin-left: 35px;
   border-bottom-left-radius: 4px;
 }
 
 .user-message {
   background-color: var(--user-message-bg);
   margin-left: auto;
-  margin-right: 20px;
+  margin-right: 35px;
   border-bottom-right-radius: 4px;
   color: var(--text-primary);
 }
 
 .message-avatar {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   position: absolute;
-  bottom: -4px;
+  bottom: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
+  min-height: 24px;
+  min-width: 24px;
 }
 
 .ai-message .message-avatar {
-  left: -14px;
+  left: -30px;
   background-color: var(--primary-color);
 }
 
 .user-message .message-avatar {
-  right: -14px;
+  right: -30px;
   background-color: var(--secondary-color);
 }
 
@@ -204,22 +206,32 @@ body {
 
   .message {
     max-width: 75%;
-    padding: 0.75rem;
+    padding: 0.75rem 1rem;
     margin-bottom: 15px;
   }
 
   .ai-message {
-    margin-left: 25px;
+    margin-left: 30px;
   }
 
   .user-message {
-    margin-right: 25px;
+    margin-right: 30px;
   }
 
   .message-avatar {
-    width: 24px;
-    height: 24px;
-    font-size: 14px;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    min-height: 20px;
+    min-width: 20px;
+  }
+
+  .ai-message .message-avatar {
+    left: -25px;
+  }
+
+  .user-message .message-avatar {
+    right: -25px;
   }
 
   .controls {
@@ -250,23 +262,31 @@ body {
 
   .message {
     max-width: 70%;
-    padding: 0.75rem;
     font-size: 0.85rem;
-    margin-bottom: 15px;
   }
 
   .ai-message {
-    margin-left: 22px;
+    margin-left: 25px;
   }
 
   .user-message {
-    margin-right: 22px;
+    margin-right: 25px;
   }
 
   .message-avatar {
-    width: 20px;
-    height: 20px;
-    font-size: 12px;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+    min-height: 18px;
+    min-width: 18px;
+  }
+
+  .ai-message .message-avatar {
+    left: -22px;
+  }
+
+  .user-message .message-avatar {
+    right: -22px;
   }
 
   .chat-header h1 {
@@ -329,8 +349,8 @@ body {
 }
 
 .message-avatar, .primary-button {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 20px;
+  min-width:  20px;
 }
 
 .controls {
