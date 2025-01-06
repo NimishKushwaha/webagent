@@ -2,23 +2,34 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure dotenv to look for .env in root directory
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// Verify the API key is loaded
+if (!process.env.OPENAI_API_KEY) {
+  console.error('OPENAI_API_KEY is not set in environment variables');
+  process.exit(1);
+}
 
 const app = express();
-const { PORT = 5000, OPENAI_API_KEY } = process.env;
+const { PORT = 5000 } = process.env;
 
 // Middleware
-app.use(cors({
-  origin: ['https://aiwebagent.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
-  methods: ['GET', 'POST'],
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
-// Initialize OpenAI with the new configuration
+// Serve static files from the dist directory
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Initialize OpenAI
 const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 // Chat endpoint
@@ -81,7 +92,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Add TTS endpoint
+// TTS endpoint
 app.post('/api/tts', async (req, res) => {
   try {
     const { text, voice, speed } = req.body;
@@ -132,6 +143,11 @@ app.use((err, req, res) => {
     error: 'Something went wrong!',
     details: err.message
   });
+});
+
+// Serve index.html for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
 // Start server
