@@ -13,7 +13,6 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // Verify the API key is loaded
 if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is not set in environment variables');
   process.exit(1);
 }
 
@@ -75,7 +74,6 @@ app.post('/api/chat', async (req, res) => {
         status: 'success'
       });
     } catch (modelError) {
-      console.error('Model error:', modelError);
       // Use mock response if model fails
       const mockResponse = generateMockResponse(message);
       res.json({
@@ -84,7 +82,6 @@ app.post('/api/chat', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error in chat endpoint:', error);
     res.status(500).json({
       error: 'An error occurred while processing your request',
       details: error.message
@@ -98,7 +95,7 @@ app.post('/api/tts', async (req, res) => {
     const { text, voice, speed } = req.body;
 
     const mp3 = await openai.audio.speech.create({
-      model: "tts-1",  // or "tts-1-hd" for higher quality
+      model: "tts-1-hd",  // or "tts-1-hd" for higher quality
       voice: voice,    // 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'
       input: text,
       speed: speed
@@ -116,7 +113,6 @@ app.post('/api/tts', async (req, res) => {
     // Send the audio data
     res.send(buffer);
   } catch (error) {
-    console.error('Error in TTS endpoint:', error);
     res.status(500).json({
       error: 'Failed to generate speech',
       details: error.message
@@ -138,7 +134,6 @@ function generateMockResponse(message) {
 
 // Error handling middleware
 app.use((err, req, res) => {
-  console.error(err.stack);
   res.status(500).json({
     error: 'Something went wrong!',
     details: err.message

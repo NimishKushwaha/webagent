@@ -17,6 +17,7 @@ class AudioService {
     this.isRecognitionActive = false;
     this.isSecureContext = window.isSecureContext;
     this.apiBaseUrl = '/api';
+    this.currentAudio = null;
     this.setupAudioContext();
     this.setupSpeechRecognition();
   }
@@ -25,13 +26,12 @@ class AudioService {
     try {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     } catch (error) {
-      console.error('Audio Context not supported:', error);
+      throw new Error('Audio Context not supported');
     }
   }
 
   async setupSpeechRecognition() {
     try {
-      // Check for mobile browser support
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const SpeechRecognition = window.SpeechRecognition || 
                                window.webkitSpeechRecognition ||
@@ -42,9 +42,8 @@ class AudioService {
         this.speechRecognition.continuous = true;
         this.speechRecognition.interimResults = true;
         
-        // Add specific settings for mobile
         if (isMobile) {
-          this.speechRecognition.interimResults = false; // More stable on mobile
+          this.speechRecognition.interimResults = false;
           this.speechRecognition.maxAlternatives = 1;
         }
         
@@ -53,7 +52,7 @@ class AudioService {
         throw new Error('Speech Recognition not supported on this device');
       }
     } catch (error) {
-      console.error('Error setting up speech recognition:', error);
+      throw new Error('Error setting up speech recognition');
     }
   }
 
@@ -186,20 +185,11 @@ class AudioService {
 
   async startRecording(onTranscript, onSilence) {
     try {
-      // Debug logging
-      console.log('Secure context:', window.isSecureContext);
-      console.log('MediaDevices available:', !!navigator.mediaDevices);
-      
-      // Check permissions
-      const permissionResult = await navigator.permissions.query({ name: 'microphone' });
-      console.log('Microphone permission:', permissionResult.state);
-
-      // Check for secure context
       if (!window.isSecureContext) {
         throw new Error('Secure context (HTTPS) required for audio input');
       }
 
-      // Check for permissions first
+      const permissionResult = await navigator.permissions.query({ name: 'microphone' });
       if (permissionResult.state === 'denied') {
         throw new Error('Microphone permission denied');
       }
@@ -223,23 +213,26 @@ class AudioService {
         if (!this.isSpeaking) {
           const transcript = Array.from(event.results)
             .map(result => result[0].transcript)
-            .join('');
-          
-          if (event.results[0].isFinal) {
-            onTranscript(transcript);
-          }
+            .join(' ');
+          onTranscript(transcript);
         }
       };
 
       this.startRecognition();
       return true;
     } catch (error) {
-      console.error('Error starting recording:', error);
       return false;
     }
   }
 
   stopRecording() {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+    
+    speechSynthesis.cancel();
+
     this.isRecording = false;
     this.stopRecognition();
     
@@ -258,6 +251,11 @@ class AudioService {
 
   async speakResponse(text) {
     try {
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
+      }
+
       this.isSpeaking = true;
       this.stopRecognition();
 
@@ -280,11 +278,13 @@ class AudioService {
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
+      this.currentAudio = audio;
 
       return new Promise((resolve) => {
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
           this.isSpeaking = false;
+          this.currentAudio = null;
           setTimeout(() => {
             if (this.isRecording) {
               this.startRecognition();
@@ -293,26 +293,32 @@ class AudioService {
           }, 1000);
         };
 
-        audio.onerror = (error) => {
-          console.error('Audio playback error:', error);
+        audio.onerror = () => {
           this.isSpeaking = false;
+          this.currentAudio = null;
           resolve(false);
         };
 
-        audio.play().catch(error => {
-          console.error('Error playing audio:', error);
+        audio.play().catch(() => {
           this.isSpeaking = false;
+          this.currentAudio = null;
           resolve(false);
         });
       });
     } catch (error) {
-      console.error('Error in text-to-speech:', error);
       return this.fallbackTTS(text);
     }
   }
 
   async fallbackTTS(text) {
     try {
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
+      }
+
+      speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
@@ -329,8 +335,7 @@ class AudioService {
           }, 1000);
         };
         
-        utterance.onerror = (error) => {
-          console.error('Speech synthesis error:', error);
+        utterance.onerror = () => {
           this.isSpeaking = false;
           resolve(false);
         };
@@ -338,7 +343,6 @@ class AudioService {
         speechSynthesis.speak(utterance);
       });
     } catch (error) {
-      console.error('Error in fallback TTS:', error);
       this.isSpeaking = false;
       return false;
     }
