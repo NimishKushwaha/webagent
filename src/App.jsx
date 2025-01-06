@@ -10,6 +10,7 @@ function App() {
   const [status, setStatus] = useState('Not connected');
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState(null);
   const chatContainerRef = useRef(null);
 
   useEffect(() => {
@@ -49,15 +50,22 @@ function App() {
   };
 
   const handleStartCall = async () => {
-    const success = await audioService.startRecording(handleTranscript, handleSilence);
-    if (success) {
-      setIsCallActive(true);
-      setStatus('Listening...');
-      const welcomeMessage = "Hello! I'm an AI sales representative. How can I help you today?";
-      addMessage(welcomeMessage, 'ai');
-      await audioService.speakResponse(welcomeMessage);
-    } else {
-      setStatus('Error: Could not access microphone');
+    try {
+      const success = await audioService.startRecording(handleTranscript, handleSilence);
+      if (success) {
+        setIsCallActive(true);
+        setStatus('Listening...');
+        const welcomeMessage = "Hello! I am your AI assistant specializing in sales and customer service. I'm here to understand your needs and provide personalized solutions. How may I assist you today?";
+        addMessage(welcomeMessage, 'ai');
+        await audioService.speakResponse(welcomeMessage);
+      } else {
+        setStatus('Error: Could not access microphone');
+        setError('Microphone access failed');
+      }
+    } catch (err) {
+      console.error('Start call error:', err);
+      setError(err.message);
+      setStatus('Error occurred');
     }
   };
 
@@ -76,6 +84,12 @@ function App() {
 
   return (
     <div className="container">
+      {error && (
+        <div className="error-message">
+          Error: {error}
+          <button onClick={() => setError(null)}>Dismiss</button>
+        </div>
+      )}
       <div className="chat-container">
         <div className="chat-header">
           <h1>AI Sales Assistant</h1>

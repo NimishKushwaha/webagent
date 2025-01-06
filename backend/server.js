@@ -9,7 +9,11 @@ const app = express();
 const { PORT = 5000, OPENAI_API_KEY } = process.env;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['https://aiwebagent.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Initialize OpenAI with the new configuration

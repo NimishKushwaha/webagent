@@ -15,6 +15,10 @@ class AudioService {
     this.lastVoiceDetection = Date.now();
     this.isSpeaking = false;
     this.isRecognitionActive = false;
+    this.isSecureContext = window.isSecureContext;
+    this.apiBaseUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000/api'
+      : `${window.location.origin}/api`;
     this.setupAudioContext();
     this.setupSpeechRecognition();
   }
@@ -27,16 +31,28 @@ class AudioService {
     }
   }
 
-  setupSpeechRecognition() {
+  async setupSpeechRecognition() {
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // Check for mobile browser support
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const SpeechRecognition = window.SpeechRecognition || 
+                               window.webkitSpeechRecognition ||
+                               (isMobile ? window.mozSpeechRecognition : null);
+
       if (SpeechRecognition) {
         this.speechRecognition = new SpeechRecognition();
         this.speechRecognition.continuous = true;
         this.speechRecognition.interimResults = true;
+        
+        // Add specific settings for mobile
+        if (isMobile) {
+          this.speechRecognition.interimResults = false; // More stable on mobile
+          this.speechRecognition.maxAlternatives = 1;
+        }
+        
         this.setupSpeechRecognitionHandlers();
       } else {
-        throw new Error('Speech Recognition not supported');
+        throw new Error('Speech Recognition not supported on this device');
       }
     } catch (error) {
       console.error('Error setting up speech recognition:', error);
@@ -172,18 +188,35 @@ class AudioService {
 
   async startRecording(onTranscript, onSilence) {
     try {
-      if (!this.speechRecognition) {
-        throw new Error('Speech recognition not supported');
+      // Debug logging
+      console.log('Secure context:', window.isSecureContext);
+      console.log('MediaDevices available:', !!navigator.mediaDevices);
+      
+      // Check permissions
+      const permissionResult = await navigator.permissions.query({ name: 'microphone' });
+      console.log('Microphone permission:', permissionResult.state);
+
+      // Check for secure context
+      if (!window.isSecureContext) {
+        throw new Error('Secure context (HTTPS) required for audio input');
       }
 
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      // Check for permissions first
+      if (permissionResult.state === 'denied') {
+        throw new Error('Microphone permission denied');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1
         }
       });
 
+      this.stream = stream;
       this.isRecording = true;
       this.onSilenceCallback = onSilence;
       this.audioProcessor = await this.setupAudioProcessing(this.stream);
@@ -230,15 +263,14 @@ class AudioService {
       this.isSpeaking = true;
       this.stopRecognition();
 
-      // Use OpenAI's TTS API
-      const response = await fetch('http://localhost:5000/api/tts', {
+      const response = await fetch(`${this.apiBaseUrl}/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           text: text,
-          voice: 'shimmer', // Can be: 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'
+          voice: 'shimmer',
           speed: 1.0
         })
       });
@@ -316,7 +348,7 @@ class AudioService {
 
   async getAIResponse(userMessage) {
     try {
-      const response = await axios.post('http://localhost:5000/api/chat', {
+      const response = await axios.post(`${this.apiBaseUrl}/chat`, {
         message: userMessage,
         context: this.conversationContext || [],
         timestamp: new Date().toISOString()
