@@ -16,9 +16,7 @@ class AudioService {
     this.isSpeaking = false;
     this.isRecognitionActive = false;
     this.isSecureContext = window.isSecureContext;
-    this.apiBaseUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:5000/api'
-      : `${window.location.origin}/api`;
+    this.apiBaseUrl = '/api';
     this.setupAudioContext();
     this.setupSpeechRecognition();
   }
