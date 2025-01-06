@@ -10,6 +10,7 @@ function App() {
   const [status, setStatus] = useState('Not connected');
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
   const [error, setError] = useState(null);
   const chatContainerRef = useRef(null);
 
@@ -36,7 +37,10 @@ function App() {
       try {
         const aiResponse = await audioService.getAIResponse(transcript);
         addMessage(aiResponse, 'ai');
+        setIsAudioLoading(true);
+        setStatus('Preparing audio response...');
         await audioService.speakResponse(aiResponse);
+        setIsAudioLoading(false);
       } catch (error) {
         console.error('Error processing response:', error);
         const errorMessage = "I apologize, but I encountered an error. Could you please repeat that?";
@@ -45,6 +49,7 @@ function App() {
       } finally {
         setIsProcessing(false);
         setStatus('Listening...');
+        audioService.resetProcessingState();
       }
     }
   };
@@ -57,7 +62,11 @@ function App() {
         setStatus('Listening...');
         const welcomeMessage = "Hello! I am your AI assistant specializing in sales and customer service. I'm here to understand your needs and provide personalized solutions. How may I assist you today?";
         addMessage(welcomeMessage, 'ai');
+        setIsAudioLoading(true);
+        setStatus('Preparing audio response...');
         await audioService.speakResponse(welcomeMessage);
+        setIsAudioLoading(false);
+        setStatus('Listening...');
       } else {
         setStatus('Error: Could not access microphone');
         setError('Microphone access failed');

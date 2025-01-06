@@ -18,6 +18,9 @@ class AudioService {
     this.isSecureContext = window.isSecureContext;
     this.apiBaseUrl = '/api';
     this.currentAudio = null;
+    this.isProcessing = false;
+    this.lastTranscript = '';
+    this.transcriptTimeout = null;
     this.setupAudioContext();
     this.setupSpeechRecognition();
   }
@@ -210,11 +213,27 @@ class AudioService {
       this.audioProcessor = await this.setupAudioProcessing(this.stream);
 
       this.speechRecognition.onresult = (event) => {
-        if (!this.isSpeaking) {
-          const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
-            .join(' ');
-          onTranscript(transcript);
+        if (this.isSpeaking) return;
+
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join(' ');
+
+        // Only process final results
+        if (event.results[event.results.length - 1].isFinal) {
+          // Clear any pending timeout
+          if (this.transcriptTimeout) {
+            clearTimeout(this.transcriptTimeout);
+          }
+
+          // Debounce the transcript processing
+          this.transcriptTimeout = setTimeout(() => {
+            if (!this.isProcessing && transcript !== this.lastTranscript) {
+              this.isProcessing = true;
+              this.lastTranscript = transcript;
+              onTranscript(transcript);
+            }
+          }, 1000); // 1 second debounce
         }
       };
 
@@ -226,6 +245,13 @@ class AudioService {
   }
 
   stopRecording() {
+    if (this.transcriptTimeout) {
+      clearTimeout(this.transcriptTimeout);
+      this.transcriptTimeout = null;
+    }
+    this.isProcessing = false;
+    this.lastTranscript = '';
+    
     if (this.currentAudio) {
       this.currentAudio.pause();
       this.currentAudio = null;
@@ -259,7 +285,8 @@ class AudioService {
       this.isSpeaking = true;
       this.stopRecognition();
 
-      const response = await fetch(`${this.apiBaseUrl}/tts`, {
+      // Start fetching audio immediately
+      const audioPromise = fetch(`${this.apiBaseUrl}/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -271,6 +298,12 @@ class AudioService {
         })
       });
 
+      // While audio is being fetched, prepare the audio context
+      if (this.audioContext?.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      const response = await audioPromise;
       if (!response.ok) {
         throw new Error('TTS API request failed');
       }
@@ -280,6 +313,9 @@ class AudioService {
       const audio = new Audio(audioUrl);
       this.currentAudio = audio;
 
+      // Start loading the audio file
+      await audio.load();
+
       return new Promise((resolve) => {
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
@@ -288,6 +324,7 @@ class AudioService {
           setTimeout(() => {
             if (this.isRecording) {
               this.startRecognition();
+              this.resetProcessingState();
             }
             resolve(true);
           }, 1000);
@@ -330,6 +367,7 @@ class AudioService {
           setTimeout(() => {
             if (this.isRecording) {
               this.startRecognition();
+              this.resetProcessingState();
             }
             resolve(true);
           }, 1000);
@@ -392,6 +430,24 @@ class AudioService {
       };
 
       this.mediaRecorder.start();
+    }
+  }
+
+  async handleTranscript(transcript) {
+    if (!this.isProcessing) {
+      this.isProcessing = true;
+      // Process the transcript
+      // Reset processing flag when done
+      this.isProcessing = false;
+    }
+  }
+
+  resetProcessingState() {
+    this.isProcessing = false;
+    this.lastTranscript = '';
+    if (this.transcriptTimeout) {
+      clearTimeout(this.transcriptTimeout);
+      this.transcriptTimeout = null;
     }
   }
 }
